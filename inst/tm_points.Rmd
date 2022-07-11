@@ -1,0 +1,43 @@
+---
+title: "Terraforming Mars Punten"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(dplyr)
+games_df <- tm::get_data()
+```
+
+```{r}
+plotly::plot_ly(
+  games_df, x = ~as.character(game_n), y = ~average_points, split = ~player,
+  type = 'scatter', mode = 'lines'
+)
+```
+
+```{r}
+plotly::plot_ly(
+  games_df, x = ~as.character(game_n), y = ~average_rank, split = ~player,
+  type = 'scatter', mode = 'lines'
+)
+```
+
+```{r}
+plotly::plot_ly(
+  games_df, x = ~as.character(game_n), y = ~magic_total, split = ~player,
+  type = 'scatter', mode = 'lines'
+)
+```
+
+```{r}
+games_df %>%
+  group_by(corporation) %>%
+  summarise(average_corp_points = mean(score)) %>%
+  plotly::plot_ly(
+    x = ~corporation, y = ~average_corp_points, type = 'bar'
+  ) %>%
+  plotly::layout(xaxis = list(categoryorder = "total descending"))
+```
+
