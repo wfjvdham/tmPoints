@@ -1,35 +1,92 @@
 ---
-title: "Terraforming Mars Punten"
+title: "Terraforming Mars S2 Tussenstand"
 date: "`r Sys.Date()`"
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(
+  echo = FALSE, message = FALSE, warning = FALSE, out.width = "100%"
+)
 library(dplyr)
 games_df <- tm::get_data()
+attacks_df <- tm::get_attacks()
 ```
+
+Zie hier de huidige tussenstand. Eerst het aantal punten per speler, deze punten zijn geschaald tussen 0 en het puntenaantal van de winnaar.
 
 ```{r}
 plotly::plot_ly(
-  games_df, x = ~as.character(game_n), y = ~average_points, split = ~player,
-  type = 'scatter', mode = 'lines'
-)
+  games_df, x = ~as.character(game_n), y = ~round(average_points),
+  type = 'scatter', mode = 'lines', color = ~player, 
+  colors = c("#AAAA00", "#009900", "#0066FF", "#AAAAAA", "#991100")
+) %>%
+  plotly::layout(
+    title = 'Aantal punten na een spel',
+    yaxis = list(title = 'punten'),
+    xaxis = list(title = 'spel nummer')
+  ) %>%
+  plotly::config(displayModeBar = FALSE)
 ```
+
+Naast de punten is de positie natuurlijk ook belangrijk. Als je eerste wordt krijg je hier 10 punten en laatste is 0 punten:
 
 ```{r}
 plotly::plot_ly(
-  games_df, x = ~as.character(game_n), y = ~average_rank, split = ~player,
+  games_df, x = ~as.character(game_n), y = ~average_rank, color = ~player, 
+  colors = c("#AAAA00", "#009900", "#0066FF", "#AAAAAA", "#991100"),
   type = 'scatter', mode = 'lines'
-)
+) %>%
+  plotly::layout(
+    title = 'Ranking na een spel',
+    yaxis = list(title = 'ranking'),
+    xaxis = list(title = 'spel nummer')
+  ) %>%
+  plotly::config(displayModeBar = FALSE)
 ```
 
+Deze 2 gemiddeldes kan je bij elkaar optellen om de magische overall ranking te krijgen. Dit betekend dus je punten + bonuspunten voor je ranking.
+
 ```{r}
-plotly::plot_ly(
-  games_df, x = ~as.character(game_n), y = ~magic_total, split = ~player,
-  type = 'scatter', mode = 'lines'
-)
+alpha <- 1
+games_df %>%
+  mutate(magic_total = average_points + alpha * average_rank) %>%
+  plotly::plot_ly(
+    x = ~as.character(game_n), y = ~round(magic_total), color = ~player, 
+    colors = c("#AAAA00", "#009900", "#0066FF", "#AAAAAA", "#991100"),
+    type = 'scatter', mode = 'lines'
+  ) %>%
+  plotly::layout(
+    title = 'Magische ranking na een spel',
+    yaxis = list(title = 'magische ranking'),
+    xaxis = list(title = 'spel nummer')
+  ) %>%
+  plotly::config(displayModeBar = FALSE)
 ```
+
+Als dit soort rankings te ingewikkeld zijn is er natuurlijk ook nog de klassieke aantal keer gewonnen:
+
+```{r}
+games_df %>%
+  filter(rank == 10) %>%
+  count(player, corporation) %>%
+  plotly::plot_ly(
+    x = ~player, y = ~n, color = ~corporation, type = 'bar'
+  ) %>%
+  plotly::layout(
+    barmode = 'stack',
+    title = 'Aantal overwinningen per speler',
+    yaxis = list(title = 'aantal overwinningen'),
+    xaxis = list(
+      title = 'speler', categoryorder = "total descending"
+    )
+  ) %>%
+  plotly::config(displayModeBar = FALSE)
+```
+
+## Corporations
+
+Nog wat extra corporation info. Dit is het gemiddelde aantal punten per corporation:
 
 ```{r}
 games_df %>%
@@ -38,6 +95,128 @@ games_df %>%
   plotly::plot_ly(
     x = ~corporation, y = ~average_corp_points, type = 'bar'
   ) %>%
-  plotly::layout(xaxis = list(categoryorder = "total descending"))
+  plotly::layout(
+    title = 'Gemiddeld aantal punten per corporation',
+    yaxis = list(title = 'corporation'),
+    xaxis = list(
+      title = 'gemiddled aantal punten', categoryorder = "total descending"
+    )
+  ) %>%
+  plotly::config(displayModeBar = FALSE)
 ```
 
+En het aantal overwinningen per corporation:
+
+```{r}
+games_df %>%
+  filter(rank == 10) %>%
+  count(corporation) %>%
+  plotly::plot_ly(
+    x = ~corporation, y = ~n, color = ~player, type = 'bar', 
+    colors = c("#AAAA00", "#009900", "#0066FF", "#AAAAAA", "#991100")
+  ) %>%
+  plotly::layout(
+    barmode = 'stack',
+    title = 'Aantal overwinningen per corporation',
+    yaxis = list(title = 'aantal overwinningen'),
+    xaxis = list(
+      title = 'speler', categoryorder = "total descending"
+    )
+  ) %>%
+  plotly::config(displayModeBar = FALSE)
+```
+
+En hoe vaak een corperation gekozen wordt:
+
+```{r}
+games_df %>%
+  ungroup() %>%
+  count(corporation) %>%
+  plotly::plot_ly(
+    x = ~corporation, y = ~n, type = 'bar'
+  ) %>%
+  plotly::layout(
+    barmode = 'stack',
+    title = 'Aantal keer gespeeld per corporation',
+    yaxis = list(title = 'aantal keer gespeeld'),
+    xaxis = list(
+      title = 'corperation', categoryorder = "total descending"
+    )
+  ) %>%
+  plotly::config(displayModeBar = FALSE)
+```
+
+## Attacks
+
+```{r}
+attacks_df %>%
+  group_by(target, resource) %>%
+  summarise(amount = sum(amount)) %>%
+  plotly::plot_ly(
+    x = ~target, y = ~amount, type = 'bar', split = ~resource
+  ) %>%
+  plotly::layout(
+    barmode = 'stack',
+    title = 'Grootste stumper',
+    yaxis = list(title = 'aantal gestolen resources'),
+    xaxis = list(
+      title = 'speler', categoryorder = "total descending"
+    )
+  ) %>%
+  plotly::config(displayModeBar = FALSE)
+```
+
+```{r}
+attacks_df %>%
+  group_by(source, resource) %>%
+  summarise(amount = sum(amount)) %>%
+  plotly::plot_ly(
+    x = ~source, y = ~amount, type = 'bar', split = ~resource
+  ) %>%
+  plotly::layout(
+    barmode = 'stack',
+    title = 'Grootste naaier',
+    yaxis = list(title = 'aantal gestolen resources'),
+    xaxis = list(
+      title = 'speler', categoryorder = "total descending"
+    )
+  ) %>%
+  plotly::config(displayModeBar = FALSE)
+```
+
+## Beginspeler
+
+```{r}
+# games_df %>%
+#   count(player, start_order) %>%
+#   plotly::plot_ly(
+#     x = ~start_order, y = ~n, color = ~player, type = 'bar',
+#     colors = c("#AAAA00", "#009900", "#0066FF", "#AAAAAA", "#991100")
+#   ) %>%
+#   plotly::layout(
+#     barmode = 'stack',
+#     title = 'Beurtvolgorder eerste generatie',
+#     yaxis = list(title = 'speler'),
+#     xaxis = list(title = 'beurtvolgorde')
+#   ) %>%
+#   plotly::config(displayModeBar = FALSE)
+```
+
+```{r}
+games_df %>%
+  plotly::plot_ly(
+    x = ~as.character(game_n), y = ~average_start_order, color = ~player, 
+    colors = c("#AAAA00", "#009900", "#0066FF", "#AAAAAA", "#991100"),
+    type = 'scatter', mode = 'lines'
+  ) %>%
+  plotly::layout(
+    title = 'Gemiddelde start volgorde, lager is eerder aan de beurt',
+    yaxis = list(title = 'volgorde'),
+    xaxis = list(title = 'spel nummer')
+  ) %>%
+  plotly::config(displayModeBar = FALSE)
+```
+
+## Undo
+
+De volgende spelers hebben als enige een undo via de database gedaan, hebben daar grote voordelen mee behaald en verdienen het onder een demos down terecht te komen: **Paul** en **Wim**. Ook een vermelding voor **Bas**, na eerst gestemd te hebben voor de no-undo policy, wachte hij wel tot de server op dinsdag avond gereset werd om een move ongedaan te maken...
