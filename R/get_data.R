@@ -20,9 +20,11 @@ get_data <- function() {
 
   games_df <- purrr::map_dfr(game_files, function(game_file) {
 
-    #game_file = game_files[7]
+    #game_file = game_files[15]
+    file_path <- file.path(system.file("games", package = "tm"), game_file)
 
-    game_object <- jsonlite::fromJSON(file.path("games", game_file))
+    game_object <- jsonlite::fromJSON(file_path)
+    #file_date <- file.info(file_path)
 
     first_player_last_gen_id <- game_object[["game"]][["first"]]
     which(game_object[["game"]][["players"]][["id"]] == first_player_last_gen_id)
@@ -33,17 +35,26 @@ get_data <- function() {
 
     scores <- game_object[["scores"]]
 
+    corporation <- game_object[["game"]][["players"]][["corporationCard"]][["name"]]
+    if (is.null(corporation)) {
+      corporation <- purrr::map_chr(
+        game_object[["game"]][["players"]][["corporations"]], "name"
+      )
+    }
+
     players <- tibble::tibble(
-      corporation = game_object[["game"]][["players"]][["corporationCard"]][["name"]],
+      corporation = corporation,
       player = game_object[["game"]][["players"]][["name"]],
       start_order = last_gen_order %% 5,
       gold = game_object[["game"]][["players"]][["terraformRating"]] +
         game_object[["game"]][["players"]][["terraformRatingAtGenerationStart"]] +
         game_object[["game"]][["players"]][["megaCreditProduction"]]
-    )
+    ) %>%
+      mutate(player = stringr::str_trim(player))
 
     left_join(scores, players, by = "corporation") %>%
       select(player, score = playerScore, gold, corporation, start_order)
+    #%>% mutate(file_date = file_date)
   }, .id = "game_id")
 
   games_df <- bind_rows(games_df, screenshot)
@@ -51,25 +62,20 @@ get_data <- function() {
   games_df <- games_df %>%
     # Why?
     filter(game_id != "S2G00") %>%
-    mutate(game_n = as.integer(stringr::str_sub(game_id, -2)))
+    mutate(
+      game_n = as.integer(stringr::str_sub(game_id, -2)),
+      season_n = as.integer(stringr::str_sub(game_id, 2, 2))
+    )
 
   games_df <- games_df %>%
     group_by(game_id) %>%
     mutate(
+      score_org = score,
       score = scales::rescale(score, to = c(0, 10), from = c(0, max(score)))
     )
 
   games_df <- games_df %>%
-    arrange(game_n) %>%
-    group_by(player) %>%
-    mutate(
-      average_points = cumsum(score),
-      start_order = start_order + 1,
-      average_start_order = cumsum(start_order) / game_n
-    )
-
-  games_df <- games_df %>%
-    group_by(game_n) %>%
+    group_by(season_n, game_n) %>%
     arrange(gold) %>%
     mutate(
       rank = rank(score, ties.method = "first"),
@@ -78,9 +84,14 @@ get_data <- function() {
     ungroup()
 
   games_df <- games_df %>%
+    group_by(season_n, player) %>%
     arrange(game_n) %>%
-    group_by(player) %>%
-    mutate(average_rank = cumsum(rank))
+    mutate(
+      average_points = cumsum(score),
+      start_order = start_order + 1,
+      average_start_order = cumsum(start_order) / game_n,
+      average_rank = cumsum(rank)
+    )
 
   colors_df <- tibble::tibble(
     player = c("Bas", "Dennis", "Paul", "Rudo", "Wim"),
@@ -90,6 +101,7 @@ get_data <- function() {
   games_df <- games_df %>%
     dplyr::left_join(colors_df, by = "player")
 
-  games_df
+  games_df %>%
+    ungroup()
 }
 

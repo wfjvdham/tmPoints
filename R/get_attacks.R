@@ -12,14 +12,20 @@ get_attacks <- function() {
 
   attacks_df <- purrr::map_dfr(game_files, function(game_file) {
 
-    game_object <- jsonlite::fromJSON(file.path("games", game_file))
+    #game_file = last(game_files)
+
+    game_object <- jsonlite::fromJSON(
+      file.path(system.file("games", package = "tm"), game_file)
+    )
 
     attacks_std <- game_object[["game"]][["gameLog"]] %>%
       select(message, data) %>%
       filter(
         message %in% c(
           "${0}'s ${1} amount ${2} by ${3} stolen by ${4}",
-          "${0}'s ${1} amount ${2} by ${3} by ${4}"
+          "${0}'s ${1} amount ${2} by ${3} by ${4}",
+          "${0}'s ${1} production ${2} by ${3} stolen by ${4}",
+          "${0}'s ${1} production ${2} by ${3} by ${4}"
         )
       ) %>%
       tidyr::unnest(data) %>%
@@ -27,25 +33,37 @@ get_attacks <- function() {
       mutate(name = rep(c(
         "target", "resource", "type", "amount", "source"
       ), nrow(.) / 5)) %>%
-      tidyr::pivot_wider(id_cols = id) %>%
+      tidyr::pivot_wider(id_cols = c(id, message)) %>%
       filter(
         type == "decreased",
         source %in% c("blue", "black", "red", "yellow", "green")
-      )
+      ) %>%
+      mutate(
+        resource = case_when(
+          stringr::str_detect(message, "production") ~ paste(resource, "production"),
+          TRUE ~ resource
+        )
+      ) %>%
+      select(-message)
 
     animal_cards <- c(
-      "Livestock", "Herbivores", "Penguins", "Fish", "Martian Zoo", "Birds"
+      "Livestock", "Herbivores", "Penguins", "Fish", "Martian Zoo", "Birds",
+      "Small Animals", "Anthozoa", "Stratospheric Birds"
     )
     microbe_cards <- c(
       "GHG Producing Bacteria", "Regolith Eaters", "Psychrophiles",
-      "Nitrite Reducing Bacteria", "Decomposers", "Tardigrades"
+      "Nitrite Reducing Bacteria", "Decomposers", "Tardigrades", "Ants",
+      "Thermophiles", "Sulphur-Eating Bacteria", "Extremophiles",
+      "Rust Eating Bacteria", "Venusian Insects"
     )
 
     attacks_ext <- game_object[["game"]][["gameLog"]] %>%
       select(message, data) %>%
       filter(
         message %in% c(
-          "${0} removed ${1} resource(s) from ${2}'s ${3}"
+          "${0} removed ${1} resource(s) from ${2}'s ${3}",
+          "${0}'s ${1} production ${2} by ${3}",
+          "${0}'s ${1} amount ${2} by ${3}"
         )
       ) %>%
       tidyr::unnest(data) %>%
@@ -53,13 +71,13 @@ get_attacks <- function() {
       mutate(name = rep(c(
         "source", "amount", "target", "card"
       ), nrow(.) / 4)) %>%
-      tidyr::pivot_wider(id_cols = id) %>%
+      tidyr::pivot_wider(id_cols = c(id, message)) %>%
       filter(source != target) %>%
       mutate(
         resource = case_when(
           card %in% animal_cards ~ "animal",
           card %in% microbe_cards ~ "microbe",
-          TRUE ~ "resource"
+          TRUE ~ card
         )
       )
 
@@ -82,7 +100,11 @@ get_attacks <- function() {
   attacks_df <- attacks_df %>%
     left_join(mapping_df, by = c("source" = "color")) %>%
     select(-source) %>%
-    rename(source = player)
+    rename(source = player) %>%
+    mutate(
+      game_n = as.integer(stringr::str_sub(game_id, -2)),
+      season_n = as.integer(stringr::str_sub(game_id, 2, 2))
+    )
 
   attacks_df
 }
