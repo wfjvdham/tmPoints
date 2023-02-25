@@ -6,17 +6,11 @@
 #' @import dplyr
 get_attacks <- function() {
 
-  game_files <- list.files(system.file("games", package = "tm"))
+  game_objects <- get_game_objects()
+  #game_object <- game_objects[20][[1]]
+  #game_object <- last(game_objects)
 
-  names(game_files) <- tools::file_path_sans_ext(game_files)
-
-  attacks_df <- purrr::map_dfr(game_files, function(game_file) {
-
-    #game_file = last(game_files)
-
-    game_object <- jsonlite::fromJSON(
-      file.path(system.file("games", package = "tm"), game_file)
-    )
+  attacks_df <- purrr::map_dfr(game_objects, function(game_object) {
 
     attacks_std <- game_object[["game"]][["gameLog"]] %>%
       select(message, data) %>%
@@ -48,38 +42,41 @@ get_attacks <- function() {
 
     animal_cards <- c(
       "Livestock", "Herbivores", "Penguins", "Fish", "Martian Zoo", "Birds",
-      "Small Animals", "Anthozoa", "Stratospheric Birds"
+      "Small Animals", "Anthozoa", "Stratospheric Birds", "Venusian Animals",
+      "Predators"
     )
     microbe_cards <- c(
       "GHG Producing Bacteria", "Regolith Eaters", "Psychrophiles",
       "Nitrite Reducing Bacteria", "Decomposers", "Tardigrades", "Ants",
       "Thermophiles", "Sulphur-Eating Bacteria", "Extremophiles",
-      "Rust Eating Bacteria", "Venusian Insects"
+      "Rust Eating Bacteria", "Venusian Insects", "Darkside Incubation Plant"
     )
 
     attacks_ext <- game_object[["game"]][["gameLog"]] %>%
       select(message, data) %>%
       filter(
         message %in% c(
-          "${0} removed ${1} resource(s) from ${2}'s ${3}",
-          "${0}'s ${1} production ${2} by ${3}",
-          "${0}'s ${1} amount ${2} by ${3}"
+          "${0} removed ${1} resource(s) from ${2}'s ${3}"
         )
       ) %>%
-      tidyr::unnest(data) %>%
-      mutate(id = rep(1:(nrow(.) / 4), each = 4)) %>%
-      mutate(name = rep(c(
-        "source", "amount", "target", "card"
-      ), nrow(.) / 4)) %>%
-      tidyr::pivot_wider(id_cols = c(id, message)) %>%
-      filter(source != target) %>%
-      mutate(
-        resource = case_when(
-          card %in% animal_cards ~ "animal",
-          card %in% microbe_cards ~ "microbe",
-          TRUE ~ card
+      tidyr::unnest(data)
+
+    if (nrow(attacks_ext) > 0) {
+      attacks_ext <- attacks_ext %>%
+        mutate(id = rep(1:(nrow(.) / 4), each = 4)) %>%
+        mutate(name = rep(c(
+          "source", "amount", "target", "card"
+        ), nrow(.) / 4)) %>%
+        tidyr::pivot_wider(id_cols = c(id, message)) %>%
+        filter(source != target) %>%
+        mutate(
+          resource = case_when(
+            card %in% animal_cards ~ "animal",
+            card %in% microbe_cards ~ "microbe",
+            TRUE ~ card
+          )
         )
-      )
+    }
 
     attacks_std %>%
       bind_rows(attacks_ext) %>%

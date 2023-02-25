@@ -14,17 +14,9 @@ get_data <- function() {
     'S2G01', 'Rudo', 39, 37, 'CrediCor', -1
   )
 
-  game_files <- list.files(system.file("games", package = "tm"))
+  games_df <- purrr::map_dfr(get_game_objects(), function(game_object) {
 
-  names(game_files) <- tools::file_path_sans_ext(game_files)
-
-  games_df <- purrr::map_dfr(game_files, function(game_file) {
-
-    #game_file = game_files[15]
-    file_path <- file.path(system.file("games", package = "tm"), game_file)
-
-    game_object <- jsonlite::fromJSON(file_path)
-    #file_date <- file.info(file_path)
+    # game_object <- last(get_game_objects())
 
     first_player_last_gen_id <- game_object[["game"]][["first"]]
     which(game_object[["game"]][["players"]][["id"]] == first_player_last_gen_id)
@@ -33,13 +25,15 @@ get_data <- function() {
       game_object[["game"]][["players"]][["id"]] == first_player_last_gen_id
     ) + shift
 
-    scores <- game_object[["scores"]]
+    scores <- game_object[["scores"]] %>%
+      mutate(corporation = sub("\\|.*", "", corporation))
 
     corporation <- game_object[["game"]][["players"]][["corporationCard"]][["name"]]
     if (is.null(corporation)) {
-      corporation <- purrr::map_chr(
-        game_object[["game"]][["players"]][["corporations"]], "name"
-      )
+      corporation <- game_object[["game"]][["players"]][["pickedCorporationCard"]]
+      # corporation <- purrr::map_chr(
+      #   game_object[["game"]][["players"]][["corporations"]], "name"
+      # )
     }
 
     players <- tibble::tibble(
@@ -53,8 +47,9 @@ get_data <- function() {
       mutate(player = stringr::str_trim(player))
 
     left_join(scores, players, by = "corporation") %>%
-      select(player, score = playerScore, gold, corporation, start_order)
-    #%>% mutate(file_date = file_date)
+      select(
+        player, score = playerScore, gold, corporation, start_order
+      )
   }, .id = "game_id")
 
   games_df <- bind_rows(games_df, screenshot)
