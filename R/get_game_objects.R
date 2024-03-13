@@ -22,5 +22,6 @@ get_game_objects <- function() {
     game_object
   })
 
+  game_objects["S2G00"] <- NULL
   game_objects
 }

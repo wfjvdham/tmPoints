@@ -40,9 +40,7 @@ get_data <- function() {
       corporation = corporation,
       player = game_object[["game"]][["players"]][["name"]],
       start_order = last_gen_order %% 5,
-      gold = game_object[["game"]][["players"]][["terraformRating"]] +
-        game_object[["game"]][["players"]][["terraformRatingAtGenerationStart"]] +
-        game_object[["game"]][["players"]][["megaCreditProduction"]]
+      gold = game_object[["game"]][["players"]][["megaCredits"]]
     ) %>%
       mutate(player = stringr::str_trim(player))
 
@@ -71,7 +69,7 @@ get_data <- function() {
 
   games_df <- games_df %>%
     group_by(season_n, game_n) %>%
-    arrange(gold) %>%
+    arrange(score, gold) %>%
     mutate(
       rank = rank(score, ties.method = "first"),
       rank = scales::rescale(rank, to = c(0, 10))

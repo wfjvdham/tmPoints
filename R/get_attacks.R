@@ -43,13 +43,14 @@ get_attacks <- function() {
     animal_cards <- c(
       "Livestock", "Herbivores", "Penguins", "Fish", "Martian Zoo", "Birds",
       "Small Animals", "Anthozoa", "Stratospheric Birds", "Venusian Animals",
-      "Predators"
+      "Predators", "Ecological Zone"
     )
     microbe_cards <- c(
       "GHG Producing Bacteria", "Regolith Eaters", "Psychrophiles",
       "Nitrite Reducing Bacteria", "Decomposers", "Tardigrades", "Ants",
       "Thermophiles", "Sulphur-Eating Bacteria", "Extremophiles",
-      "Rust Eating Bacteria", "Venusian Insects", "Darkside Incubation Plant"
+      "Rust Eating Bacteria", "Venusian Insects", "Darkside Incubation Plant",
+      "Recyclon"
     )
 
     attacks_ext <- game_object[["game"]][["gameLog"]] %>%
@@ -101,6 +102,26 @@ get_attacks <- function() {
     mutate(
       game_n = as.integer(stringr::str_sub(game_id, -2)),
       season_n = as.integer(stringr::str_sub(game_id, 2, 2))
+    )
+
+  attacks_df <- attacks_df %>%
+    mutate(
+      resource_factor = case_when(
+        resource == "plants" ~ 2,
+        resource == "microbe" ~ 2,
+        resource == "megacredits" ~ 1,
+        resource == "steel" ~ 2,
+        resource == "heat production" ~ 6,
+        resource == "plants production" ~ 10,
+        resource == "titanium production" ~ 10,
+        resource == "energy production" ~ 7,
+        resource == "animal" ~ 3,
+        resource == "titanium" ~ 3,
+        resource == "megacredits production" ~ 5,
+        resource == "steel production" ~ 8,
+        resource == "heat" ~ 0.5
+      ),
+      amount_factor = amount * resource_factor
     )
 
   attacks_df
